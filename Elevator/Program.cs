@@ -1,4 +1,5 @@
 ﻿using System;
+using System.Timers;
 using System.Collections;
 using System.Collections.Generic;
 using System.IO;
@@ -99,12 +100,24 @@ namespace Elevator
             AddFloorToList(floor, requestedDirection);
         }
 
+        //temp 
+        static DateTime mark = DateTime.Now;
+
         /// <summary>
         /// break to give users a chance to call on other floors.  
         /// This is a bit contrived.  The Call method should be asynchronous to be able to add to a list anytime.
         /// </summary>
-        public void Proceed()
+        public void Proceed(object source, ElapsedEventArgs e)
         {
+            Console.WriteLine("Hello World.");
+/*
+            TimeSpan timespan = DateTime.Now.Subtract(mark);
+            if (timespan > new TimeSpan(0,0,0,5,0))
+            {
+                Console.WriteLine("Hello World.");
+                mark = DateTime.Now;
+            }
+/*
             List<int> directionList = null;
 
             if (ElevatorDirection == Direction.up)
@@ -133,6 +146,7 @@ namespace Elevator
                     break;  // to give users a chance to call
                 }
             }
+*/
         }
 
         /// <summary>
@@ -227,6 +241,54 @@ namespace Elevator
             return proceed;
         }
 
+        public void HandleEvent(object sender, EventArgs args)
+        {
+            Console.WriteLine("We see there was some input here: {0}", args);
+        }
+
+        public async Task<string> GetInputAsync()
+        {
+            return await Task.Run(() => GatherInput());
+        }
+
+        private string GatherInput()
+        {
+            string input = Console.ReadLine();
+
+            Console.WriteLine("User just added {0}", input);
+
+            return input;
+        }
+    }
+
+    class InputEvent : EventArgs
+    {
+        private readonly string input;
+
+        public InputEvent(string s)
+        {
+            input = s;
+        }
+
+        public string Input()
+        {
+            return input;
+        }
+    }
+
+    class Observable
+    {
+        public event EventHandler SomethingHappened;
+
+        public void DoSomething()
+        {
+            string input = Console.ReadLine();
+            EventHandler handler = SomethingHappened;
+            if (handler != null)
+            {
+                handler(this, new InputEvent(input));
+            }
+        }
     }
 
     class Program
@@ -238,16 +300,24 @@ namespace Elevator
             Elevator elevator = new Elevator(NumberOfFloors);
             int callFloor;
             Direction callDirection;
+            bool proceed = true;
 
             Console.WriteLine("The building has 10 floors (0 - 9).  Enter d for down, u for up and a digit.  i.e. u1.  If you enter bad data, we figure you are done and the application will terminate.");
 
-            bool proceed = elevator.ProcessInput(out callFloor, out callDirection);
+            Timer aTimer = new Timer();
+            aTimer.Elapsed += new ElapsedEventHandler(elevator.Proceed);
+            aTimer.Interval = 5000;
+            aTimer.Enabled = true;
+
+            Observable observable = new Observable();
+            observable.SomethingHappened += elevator.HandleEvent;
+            proceed = elevator.ProcessInput(out callFloor, out callDirection);
 
             while (proceed)
             {
                 Console.WriteLine("{0}: {1}", callDirection.ToString().ToUpper(), callFloor);
                 elevator.Call(callFloor, callDirection);
-                elevator.Proceed();
+                //elevator.Proceed();
                 proceed = elevator.ProcessInput(out callFloor, out callDirection);
             };
 

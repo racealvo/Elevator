@@ -1,6 +1,0 @@
-C:\Users\Ray-2011\Documents\School\Job Interview Problems\Elevator\Elevator\bin\Debug\Elevator.exe.config
-C:\Users\Ray-2011\Documents\School\Job Interview Problems\Elevator\Elevator\bin\Debug\Elevator.exe
-C:\Users\Ray-2011\Documents\School\Job Interview Problems\Elevator\Elevator\bin\Debug\Elevator.pdb
-C:\Users\Ray-2011\Documents\School\Job Interview Problems\Elevator\Elevator\obj\Debug\Elevator.exe
-C:\Users\Ray-2011\Documents\School\Job Interview Problems\Elevator\Elevator\obj\Debug\Elevator.pdb
-C:\Users\Ray-2011\Documents\School\Job Interview Problems\Elevator\Elevator\obj\Debug\Elevator.csprojResolveAssemblyReference.cache
