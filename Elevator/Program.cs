@@ -24,6 +24,8 @@ namespace Elevator
 
         private int NumberOfFloorsInBuilding { get; }
 
+        private static Direction FutureDirection { get; set; }
+
         // The elevator's current location
         private int currentFloor;
         private int CurrentFloor {
@@ -49,6 +51,7 @@ namespace Elevator
         public Elevator(int floors, int currentFloor = 0)
         {
             ElevatorDirection = Direction.idle;
+            FutureDirection = Direction.up;
             CurrentFloor = currentFloor;
             NumberOfFloorsInBuilding = floors;
 
@@ -100,52 +103,55 @@ namespace Elevator
             AddFloorToList(floor, requestedDirection);
         }
 
-        //temp 
-        static DateTime mark = DateTime.Now;
-
         /// <summary>
         /// break to give users a chance to call on other floors.  
         /// This is a bit contrived.  The Call method should be asynchronous to be able to add to a list anytime.
         /// </summary>
         public void Proceed(object source, ElapsedEventArgs e)
         {
-            Console.WriteLine("Hello World.");
-/*
-            TimeSpan timespan = DateTime.Now.Subtract(mark);
-            if (timespan > new TimeSpan(0,0,0,5,0))
-            {
-                Console.WriteLine("Hello World.");
-                mark = DateTime.Now;
-            }
-/*
-            List<int> directionList = null;
+            List <int> directionList = null;
 
             if (ElevatorDirection == Direction.up)
             {
                 directionList = upList;
+                FutureDirection = Direction.down;
             }
-            else
+            else if (ElevatorDirection == Direction.down)
             {
                 directionList = downList;
+                FutureDirection = Direction.up;
+            }
+            else // The elevator is idle - Get the future direction list, go to the floor at the beginning of that list - if it is populated
+            {
+                directionList = (FutureDirection == Direction.up) ? upList : downList;
+
+                if (directionList.Count > 0)
+                {
+                    // Specificially 0, the directionList may actually contain the current floor.  
+                    // However, someone may have called from another floor above/below.  
+                    // 0 means this is the top/bottom of that list and noone else is above/below.
+                    if (directionList[0] != CurrentFloor)
+                    {
+                        // Move the elevator 
+                        CurrentFloor = (FutureDirection == Direction.up) ? CurrentFloor + 1 : CurrentFloor - 1;
+
+                        Console.WriteLine("The elevator is moving past floor {0} transitioning to {1}", CurrentFloor, directionList[0]);
+                        return;
+                    }
+                }
+            }
+
+
+            Console.WriteLine("Car on floor {0} and ", CurrentFloor, (ElevatorDirection == Direction.idle) ? "is idle." : "is heading " + ElevatorDirection.ToString());
+/*
+            // LEFT HERE
+            if (directionList.Contains(CurrentFloor))
+            {
+                directionList.Remove(CurrentFloor);
+                Console.WriteLine("Loaded passengers on floor {0}. Heading {1}.  Waiting for input from passenger.", CurrentFloor, ElevatorDirection.ToString());
             }
 
             // handle the reverse direction
-
-            // proceed to the floor - clear floors from the list.
-            foreach (int floor in directionList)
-            {
-                if (CurrentFloor <= floor)
-                {
-                    CurrentFloor = floor;
-                    directionList.Remove(floor);
-                    Console.WriteLine("Loaded passengers on floor {0}. Heading {1}.  Waiting for input from passenger.", floor, ElevatorDirection.ToString());
-                    if (PassengerInput())
-                    {
-                        Proceed();
-                    }
-                    break;  // to give users a chance to call
-                }
-            }
 */
         }
 
