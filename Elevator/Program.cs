@@ -34,11 +34,15 @@ namespace Elevator
             {
                 if (value >= NumberOfFloorsInBuilding)
                 {
-                    currentFloor = NumberOfFloorsInBuilding - 1;
+                    currentFloor = (NumberOfFloorsInBuilding == 0) ? 0 : NumberOfFloorsInBuilding - 1;
                 }
                 else if (value < 0)
                 {
                     currentFloor = 0;
+                }
+                else
+                {
+                    currentFloor = value;
                 }
             }
         }
@@ -89,7 +93,6 @@ namespace Elevator
         /// If the elevator is idle, then set the elevator direction.
         /// Add true flag for the floor (array index) in the direction array.
         /// 
-        /// The Call method should really be asynchronous to be able to add to a list anytime.
         /// </summary>
         /// <param name="floor"></param>
         /// <param name="direction"></param>
@@ -97,15 +100,14 @@ namespace Elevator
         {
             if (ElevatorDirection == Direction.idle)
             {
-                ElevatorDirection = requestedDirection;
+                FutureDirection = requestedDirection;
             }
 
             AddFloorToList(floor, requestedDirection);
+            //Console.WriteLine("{0}: {1}", requestedDirection.ToString(), floor);
         }
 
         /// <summary>
-        /// break to give users a chance to call on other floors.  
-        /// This is a bit contrived.  The Call method should be asynchronous to be able to add to a list anytime.
         /// </summary>
         public void Proceed(object source, ElapsedEventArgs e)
         {
@@ -138,58 +140,43 @@ namespace Elevator
                         Console.WriteLine("The elevator is moving past floor {0} transitioning to {1}", CurrentFloor, directionList[0]);
                         return;
                     }
+
+                    ElevatorDirection = FutureDirection;
                 }
             }
 
 
-            Console.WriteLine("Car on floor {0} and ", CurrentFloor, (ElevatorDirection == Direction.idle) ? "is idle." : "is heading " + ElevatorDirection.ToString());
-/*
-            // LEFT HERE
             if (directionList.Contains(CurrentFloor))
             {
+                Console.WriteLine("Car is on floor {0}, loading/unloading passengers, and {1}.", CurrentFloor, (ElevatorDirection == Direction.idle) ? "is idle" : "is heading " + ElevatorDirection.ToString());
+                Console.WriteLine("debug: you should not see idle here.");
                 directionList.Remove(CurrentFloor);
-                Console.WriteLine("Loaded passengers on floor {0}. Heading {1}.  Waiting for input from passenger.", CurrentFloor, ElevatorDirection.ToString());
             }
 
-            // handle the reverse direction
-*/
+            if (upList.Count == 0 && downList.Count == 0)
+            {
+                ElevatorDirection = Direction.idle;
+                Console.WriteLine("The elevator is idle.");
+            }
+            else
+            {
+                // Move the elevator 
+                Console.WriteLine("The elevator is moving past floor {0} transitioning to {1}", CurrentFloor, directionList.Find((n) => n > CurrentFloor));
+                CurrentFloor = (ElevatorDirection == Direction.up) ? CurrentFloor + 1 : CurrentFloor - 1;
+            }
         }
 
-        /// <summary>
-        /// Get passenger floor input.  
-        /// 
-        /// </summary>
-        /// <returns>If input is non-numeric, then return false.  The passenger opted not to press a floor.</returns>
-        private bool PassengerInput()
+        private void RequestFromCar(int floor)
         {
-            bool goSomewhere = false;
-            string input = string.Empty;
-            int floor = -1;
-
-            try
+            if (((ElevatorDirection == Direction.up) && (floor > CurrentFloor)) ||
+                ((ElevatorDirection == Direction.down) && (floor < CurrentFloor)))
             {
-                Console.WriteLine("You are on the elevator.  Please choose a destination floor.");
-
-                // Wait for user input.  This elevator is not moving anywhere.
-                // TODO: do this asynchronously
-                input = Console.ReadLine();
-
-                floor = (int)Char.GetNumericValue(input[0]);
-
-                // Add floor only if it is valid.  On a real elevator - light the floor light - to acknowledge the user, but do not add the floor to the service list
-                if ((ElevatorDirection == Direction.up && (floor > CurrentFloor)) ||
-                    (ElevatorDirection == Direction.down && (floor < CurrentFloor)))
-                {
-                    AddFloorToList(floor, ElevatorDirection);
-                    goSomewhere = true;
-                }
+                AddFloorToList(floor, ElevatorDirection);
             }
-            catch (Exception ex)
+            else if (ElevatorDirection == Direction.idle)
             {
-                // ignore any bad data and move onward.
+                AddFloorToList(floor, FutureDirection);
             }
-
-            return goSomewhere;
         }
 
         /// <summary>
@@ -205,18 +192,16 @@ namespace Elevator
         /// </summary>
         /// <param name="input"></param>
         /// <returns></returns>
-        public bool ProcessInput(out int floor, out Direction direction)
+        public bool ProcessInput()
         {
             bool proceed = true;
-            floor = -1;
-            direction = Direction.idle;
+            int floor = -1;
+            Direction direction = Direction.idle;
             string input = string.Empty;
 
             try
             {
-                Console.WriteLine("Elevator is idle.");
                 // Wait for user input.
-                // TODO: do this asynchronously
                 input = Console.ReadLine();
 
                 input = input.ToUpper();
@@ -225,19 +210,23 @@ namespace Elevator
                     throw (new Exception());
                 }
 
+                floor = (int)Char.GetNumericValue(input[1]);
                 switch (input[0])
                 {
+                    case 'P':
+                        RequestFromCar(floor);
+                        break;
                     case 'U':
                         direction = Direction.up;
+                        Call(floor, direction);
                         break;
                     case 'D':
                         direction = Direction.down;
+                        Call(floor, direction);
                         break;
                     default:
                         throw (new Exception());
                 }
-
-                floor = (int)Char.GetNumericValue(input[1]);
             }
             catch (Exception ex)
             {
@@ -245,55 +234,6 @@ namespace Elevator
             }
 
             return proceed;
-        }
-
-        public void HandleEvent(object sender, EventArgs args)
-        {
-            Console.WriteLine("We see there was some input here: {0}", args);
-        }
-
-        public async Task<string> GetInputAsync()
-        {
-            return await Task.Run(() => GatherInput());
-        }
-
-        private string GatherInput()
-        {
-            string input = Console.ReadLine();
-
-            Console.WriteLine("User just added {0}", input);
-
-            return input;
-        }
-    }
-
-    class InputEvent : EventArgs
-    {
-        private readonly string input;
-
-        public InputEvent(string s)
-        {
-            input = s;
-        }
-
-        public string Input()
-        {
-            return input;
-        }
-    }
-
-    class Observable
-    {
-        public event EventHandler SomethingHappened;
-
-        public void DoSomething()
-        {
-            string input = Console.ReadLine();
-            EventHandler handler = SomethingHappened;
-            if (handler != null)
-            {
-                handler(this, new InputEvent(input));
-            }
         }
     }
 
@@ -315,17 +255,10 @@ namespace Elevator
             aTimer.Interval = 5000;
             aTimer.Enabled = true;
 
-            Observable observable = new Observable();
-            observable.SomethingHappened += elevator.HandleEvent;
-            proceed = elevator.ProcessInput(out callFloor, out callDirection);
-
-            while (proceed)
+            do
             {
-                Console.WriteLine("{0}: {1}", callDirection.ToString().ToUpper(), callFloor);
-                elevator.Call(callFloor, callDirection);
-                //elevator.Proceed();
-                proceed = elevator.ProcessInput(out callFloor, out callDirection);
-            };
+                proceed = elevator.ProcessInput();
+            } while (proceed);
 
             Console.WriteLine("Terminating Application.\nGoodbye.");
         }
