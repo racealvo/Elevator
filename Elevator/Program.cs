@@ -7,20 +7,47 @@ using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
 
+/// <summary>
+/// This is a non-scalable version of an elevator program.  To scale it, we will have to make the upList and 
+/// downList a global object, and deal with locking/unlocking sections of the Proceed method.
+/// </summary>
 namespace Elevator
 {
+    /// <summary>
+    /// The only reason this is a static object is to be able to disable and re-enable the timer during debugging
+    /// Set this value as a watched value.  If you disable it, be sure to enable it prior to resuming your program.
+    /// Otherwise, the app will freeze.
+    /// 
+    /// ElevatorTimer.TheTimer.Enabled
+    /// </summary>
+    public static class ElevatorTimer
+    {
+        static Timer timer = new Timer();
+
+        static public Timer TheTimer
+        {
+            get { return timer; }
+        }
+    }
+
+    /// <summary>
+    /// Define the elevator directions.
+    /// </summary>
     public enum Direction
     {
         up, down, idle
     }
 
+    /// <summary>
+    /// The elevator class.  It does the (ahem) heavy lifting. 
+    /// </summary>
     public class Elevator
     {
         private List<int> upList;
         private List<int> downList;
 
         // This determines from which which list we service
-        private Direction ElevatorDirection { get; set; }
+        private Direction CurrentDirection { get; set; }
 
         private int NumberOfFloorsInBuilding { get; }
 
@@ -47,6 +74,16 @@ namespace Elevator
             }
         }
 
+        private Direction OppositeDirection
+        {
+            get
+            {
+                if (CurrentDirection == Direction.idle)
+                    return Direction.idle;
+
+                return (CurrentDirection == Direction.up) ? Direction.down : Direction.up;
+            }
+        }
         /// <summary>
         /// Need the number of floors in the building.  
         /// </summary>
@@ -54,7 +91,7 @@ namespace Elevator
         /// <param name="currentFloor">currentFloor: default is 1</param>
         public Elevator(int floors, int currentFloor = 0)
         {
-            ElevatorDirection = Direction.idle;
+            CurrentDirection = Direction.idle;
             FutureDirection = Direction.up;
             CurrentFloor = currentFloor;
             NumberOfFloorsInBuilding = floors;
@@ -98,27 +135,29 @@ namespace Elevator
         /// <param name="direction"></param>
         public void Call(int floor, Direction requestedDirection)
         {
-            if (ElevatorDirection == Direction.idle)
+            if (CurrentDirection == Direction.idle)
             {
-                FutureDirection = requestedDirection;
+                CurrentDirection = requestedDirection;
+                FutureDirection = OppositeDirection;
             }
 
             AddFloorToList(floor, requestedDirection);
-            //Console.WriteLine("{0}: {1}", requestedDirection.ToString(), floor);
         }
 
         /// <summary>
+        /// This method is called asynchronously.  It executes on a timer event.
+        /// This method determines whether to stop on the current floor or proceed to the next floor.
         /// </summary>
         public void Proceed(object source, ElapsedEventArgs e)
         {
             List <int> directionList = null;
 
-            if (ElevatorDirection == Direction.up)
+            if (CurrentDirection == Direction.up)
             {
                 directionList = upList;
                 FutureDirection = Direction.down;
             }
-            else if (ElevatorDirection == Direction.down)
+            else if (CurrentDirection == Direction.down)
             {
                 directionList = downList;
                 FutureDirection = Direction.up;
@@ -136,44 +175,65 @@ namespace Elevator
                     {
                         // Move the elevator 
                         CurrentFloor = (FutureDirection == Direction.up) ? CurrentFloor + 1 : CurrentFloor - 1;
-
                         Console.WriteLine("The elevator is moving past floor {0} transitioning to {1}", CurrentFloor, directionList[0]);
                         return;
                     }
 
-                    ElevatorDirection = FutureDirection;
+                    CurrentDirection = FutureDirection;
                 }
             }
 
 
             if (directionList.Contains(CurrentFloor))
             {
-                Console.WriteLine("Car is on floor {0}, loading/unloading passengers, and {1}.", CurrentFloor, (ElevatorDirection == Direction.idle) ? "is idle" : "is heading " + ElevatorDirection.ToString());
-                Console.WriteLine("debug: you should not see idle here.");
+                Console.WriteLine("Car is on floor {0}, loading/unloading passengers, and {1}.", CurrentFloor, (CurrentDirection == Direction.idle) ? "is idle" : "is heading " + CurrentDirection.ToString());
+                Console.WriteLine("You have {0} seconds to choose your destination.  Otherwise, you may loose your turn.", ElevatorTimer.TheTimer.Interval/1000);
                 directionList.Remove(CurrentFloor);
+                return;
             }
 
+            // Set idle state
             if (upList.Count == 0 && downList.Count == 0)
             {
-                ElevatorDirection = Direction.idle;
+                CurrentDirection = Direction.idle;
                 Console.WriteLine("The elevator is idle.");
+                return;
             }
-            else
+
+            // Reverse direction
+            if ((CurrentDirection == Direction.up) && (upList.Count == 0) ||
+                (CurrentDirection == Direction.down) && (downList.Count == 0))
             {
-                // Move the elevator 
-                Console.WriteLine("The elevator is moving past floor {0} transitioning to {1}", CurrentFloor, directionList.Find((n) => n > CurrentFloor));
-                CurrentFloor = (ElevatorDirection == Direction.up) ? CurrentFloor + 1 : CurrentFloor - 1;
+                CurrentDirection = OppositeDirection;
             }
+
+            // Move the elevator 
+            // LEFT HERE - Fix the find to work in both directions.
+            Console.WriteLine("The elevator is moving past floor {0} transitioning to {1}", CurrentFloor, directionList.Find((n) => n > CurrentFloor));
+            CurrentFloor = (CurrentDirection == Direction.up) ? CurrentFloor + 1 : CurrentFloor - 1;
         }
 
+        /// <summary>
+        /// Conditionally add the floor request to a list.
+        /// 
+        /// If the car is heading up past floor 5 and the passenger hits 2, the floor is ignored.
+        /// If the car is idle and responding to a floor request and happens to have a passenger
+        /// </summary>
+        /// <param name="floor"></param>
         private void RequestFromCar(int floor)
         {
-            if (((ElevatorDirection == Direction.up) && (floor > CurrentFloor)) ||
-                ((ElevatorDirection == Direction.down) && (floor < CurrentFloor)))
+            if (((CurrentDirection == Direction.up) && (floor > CurrentFloor)) ||
+                ((CurrentDirection == Direction.down) && (floor < CurrentFloor)))
             {
-                AddFloorToList(floor, ElevatorDirection);
+                AddFloorToList(floor, CurrentDirection);
             }
-            else if (ElevatorDirection == Direction.idle)
+            // This condition is most relevant to a building with a single elevator
+            else if (((CurrentDirection == Direction.up) && (floor < CurrentFloor)) ||
+                     ((CurrentDirection == Direction.down) && (floor > CurrentFloor)))
+            {
+                AddFloorToList(floor, OppositeDirection);
+            }
+            else if (CurrentDirection == Direction.idle)
             {
                 AddFloorToList(floor, FutureDirection);
             }
@@ -189,6 +249,9 @@ namespace Elevator
         /// D for down
         /// floors 0-9.  
         /// i.e. u6 - indicates a call from floor 6 requesting to go up. (case insensitive)
+        /// 
+        /// P for passenger floor request within the elevator car
+        /// i.e. p4 - indicates a passenger in the elevator pressed the 4 button. (case insensitive)
         /// </summary>
         /// <param name="input"></param>
         /// <returns></returns>
@@ -250,10 +313,10 @@ namespace Elevator
 
             Console.WriteLine("The building has 10 floors (0 - 9).  Enter d for down, u for up and a digit.  i.e. u1.  If you enter bad data, we figure you are done and the application will terminate.");
 
-            Timer aTimer = new Timer();
-            aTimer.Elapsed += new ElapsedEventHandler(elevator.Proceed);
-            aTimer.Interval = 5000;
-            aTimer.Enabled = true;
+            //Timer aTimer = new Timer();
+            ElevatorTimer.TheTimer.Elapsed += new ElapsedEventHandler(elevator.Proceed);
+            ElevatorTimer.TheTimer.Interval = 5000;
+            ElevatorTimer.TheTimer.Enabled = true;
 
             do
             {
