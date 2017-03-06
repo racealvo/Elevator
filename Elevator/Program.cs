@@ -144,23 +144,30 @@ namespace Elevator
             AddFloorToList(floor, requestedDirection);
         }
 
+        List<int> DirectionList()
+        {
+            List<int> directionList = null;
+
+            if (CurrentDirection == Direction.up)
+                directionList = upList;
+            else if (CurrentDirection == Direction.down)
+                directionList = downList;
+
+            return directionList;
+        }
+
         /// <summary>
         /// This method is called asynchronously.  It executes on a timer event.
         /// This method determines whether to stop on the current floor or proceed to the next floor.
         /// </summary>
         public void Proceed(object source, ElapsedEventArgs e)
         {
-            List <int> directionList = null;
+            List<int> directionList = null;
 
-            if (CurrentDirection == Direction.up)
+            if ((CurrentDirection == Direction.up) || (CurrentDirection == Direction.down))
             {
-                directionList = upList;
-                FutureDirection = Direction.down;
-            }
-            else if (CurrentDirection == Direction.down)
-            {
-                directionList = downList;
-                FutureDirection = Direction.up;
+                directionList = DirectionList();
+                FutureDirection = OppositeDirection;
             }
             else // The elevator is idle - Get the future direction list, go to the floor at the beginning of that list - if it is populated
             {
@@ -175,7 +182,7 @@ namespace Elevator
                     {
                         // Move the elevator 
                         CurrentFloor = (FutureDirection == Direction.up) ? CurrentFloor + 1 : CurrentFloor - 1;
-                        Console.WriteLine("The elevator is moving past floor {0} transitioning to {1}", CurrentFloor, directionList[0]);
+                        Console.WriteLine("The elevator is moving past floor {0} transitioning to {1}", CurrentFloor, directionList.First());
                         return;
                     }
 
@@ -187,7 +194,7 @@ namespace Elevator
             if (directionList.Contains(CurrentFloor))
             {
                 Console.WriteLine("Car is on floor {0}, loading/unloading passengers, and {1}.", CurrentFloor, (CurrentDirection == Direction.idle) ? "is idle" : "is heading " + CurrentDirection.ToString());
-                Console.WriteLine("You have {0} seconds to choose your destination.  Otherwise, you may loose your turn.", ElevatorTimer.TheTimer.Interval/1000);
+                Console.WriteLine("You have {0} seconds to choose your destination.  Otherwise, you may loose your turn.", ElevatorTimer.TheTimer.Interval / 1000);
                 directionList.Remove(CurrentFloor);
                 return;
             }
@@ -196,7 +203,7 @@ namespace Elevator
             if (upList.Count == 0 && downList.Count == 0)
             {
                 CurrentDirection = Direction.idle;
-                Console.WriteLine("The elevator is idle.");
+                Console.WriteLine("The elevator is idle at floor {0}.", CurrentFloor);
                 return;
             }
 
@@ -205,12 +212,46 @@ namespace Elevator
                 (CurrentDirection == Direction.down) && (downList.Count == 0))
             {
                 CurrentDirection = OppositeDirection;
+                directionList = DirectionList();
             }
 
-            // Move the elevator 
-            // LEFT HERE - Fix the find to work in both directions.
-            Console.WriteLine("The elevator is moving past floor {0} transitioning to {1}", CurrentFloor, directionList.Find((n) => n > CurrentFloor));
-            CurrentFloor = (CurrentDirection == Direction.up) ? CurrentFloor + 1 : CurrentFloor - 1;
+            // Move the elevator - one of the lists is populated
+            if (directionList != null)
+            {
+                int? found;
+
+                // LEFT HERE - find is not right - want the null condition - so that we can reverse.
+                if (CurrentDirection == Direction.up)
+                {
+                    found = upList.Find(f => f > CurrentFloor);
+                }
+                else
+                {
+                    found = downList.Find(f => f < CurrentFloor);
+                }
+
+                // We are at the end of the list going in this direction.
+                if (found == null)
+                {
+                    List<int> originalList = DirectionList();
+                    CurrentDirection = OppositeDirection;
+                    directionList = DirectionList();
+
+                    // are there any items in the current list?
+                    if (directionList.Count == 0)
+                    {
+                        CurrentDirection = OppositeDirection;
+                        found = originalList.First();
+                    }
+                    else
+                    {
+                        found = directionList.First();
+                    }
+                }
+
+                Console.WriteLine("The elevator is moving past floor {0} transitioning to {1}", CurrentFloor, found);
+                CurrentFloor = (CurrentDirection == Direction.up) ? CurrentFloor + 1 : CurrentFloor - 1;
+            }
         }
 
         /// <summary>
