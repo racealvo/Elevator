@@ -217,6 +217,8 @@ namespace Elevator
             // The elevator is moving in a direction
             if ((CurrentDirection == Direction.up) || (CurrentDirection == Direction.down))
             {
+                int destination = -1;
+
                 // Are there more items on the CurrentList - which are eligible for servicing?
                 int found = CurrentList.FindIndex((n) =>
                 {
@@ -238,9 +240,14 @@ namespace Elevator
                     }
                     CurrentList = otherList;
                     SetDirection();
+                    destination = CurrentList[0];
+                }
+                else
+                {
+                    destination = CurrentList[found];
                 }
 
-                Console.WriteLine("The elevator is moving past floor {0} transitioning to {1}", CurrentFloor, CurrentList[0]);
+                Console.WriteLine("The elevator is moving past floor {0} transitioning to {1}", CurrentFloor, destination);
                 CurrentFloor = (CurrentDirection == Direction.up) ? CurrentFloor + 1 : CurrentFloor - 1;
                 //FutureDirection = OppositeDirection;
                 return;
@@ -250,7 +257,7 @@ namespace Elevator
         /// <summary>
         /// Conditionally add the floor request to a list.
         /// 
-        /// If the car is heading up past floor 5 and the passenger hits 2, the floor is ignored.
+        /// If the car is heading up past floor 5 and the passenger hits 2, the floor is added to the other list.
         /// If the car is idle and responding to a floor request and happens to have a passenger
         /// </summary>
         /// <param name="floor"></param>
@@ -262,8 +269,8 @@ namespace Elevator
                 AddFloorToList(floor, CurrentDirection);
             }
             // This condition is most relevant to a building with a single elevator
-            else if (((CurrentDirection == Direction.up) && (floor < CurrentFloor)) ||
-                     ((CurrentDirection == Direction.down) && (floor > CurrentFloor)))
+            else if (((CurrentDirection == Direction.up) && (floor <= CurrentFloor)) ||
+                     ((CurrentDirection == Direction.down) && (floor >= CurrentFloor)))
             {
                 AddFloorToList(floor, OppositeDirection);
             }
