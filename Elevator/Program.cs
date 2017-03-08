@@ -174,31 +174,53 @@ namespace Elevator
         }
 
         /// <summary>
-        /// This method is called asynchronously.  It executes on a timer event.
-        /// This method determines whether to stop on the current floor or proceed to the next floor.
+        /// Has the car arrived at its destination?
         /// </summary>
-        public void Proceed(object source, ElapsedEventArgs e)
+        /// <returns>true if arrived, false if still transitioning.</returns>
+        private bool ArrivedDestination()
         {
-            // Have we arrived?
+            bool arrived = false;
+
             if (CurrentList.Contains(CurrentFloor))
             {
                 Console.WriteLine("Car is on floor {0}, loading/unloading passengers, and {1}.", CurrentFloor, (CurrentDirection == Direction.idle) ? "is idle" : "is heading " + CurrentDirection.ToString());
                 Console.WriteLine("You have {0} seconds to choose your destination.  Otherwise, you may loose your turn.", ElevatorTimer.TheTimer.Interval / 1000);
                 CurrentList.Remove(CurrentFloor);
-                return;
+                arrived = true;
             }
+
+            return arrived;
+        }
+
+        /// <summary>
+        /// Is the elevator idle?
+        /// </summary>
+        /// <returns>true if idle, false if still transitioning</returns>
+        private bool IsIdle()
+        {
+            bool idle = false;
 
             // Set idle state
             if (upList.Count == 0 && downList.Count == 0)
             {
                 CurrentDirection = Direction.idle;
                 Console.WriteLine("The elevator is idle at floor {0}.", CurrentFloor);
-                return;
+                idle = true;
             }
 
+            return idle;
+        }
+
+        /// <summary>
+        /// The elevator is idle but should not be idle because there are calls needing service.
+        /// Set a direction.  Start with the FutureList.  If there is nothing, then go with the other list.
+        /// </summary>
+        private void DetermineDirection()
+        {
             // The elevator is idle but one of the lists is populated and needs servicing.
             // Get the future direction list, go to the floor at the beginning of that list - if it is populated
-            if (CurrentDirection == Direction.idle)
+            if ((CurrentDirection == Direction.idle) &&
+                ((upList.Count > 0) || (downList.Count > 0)))
             {
                 // Try the future list first - if it is populated.  Otherwise, go with the other list.
                 CurrentList = (FutureDirection == Direction.up) ? upList : downList;
@@ -213,7 +235,10 @@ namespace Elevator
 
                 SetDirection();
             }
+        }
 
+        private void MoveElevator()
+        {
             // The elevator is moving in a direction
             if ((CurrentDirection == Direction.up) || (CurrentDirection == Direction.down))
             {
@@ -241,6 +266,13 @@ namespace Elevator
                     CurrentList = otherList;
                     SetDirection();
                     destination = CurrentList[0];
+
+                    // We have switched lists.  Are we on a floor on the new list?
+                    if (CurrentFloor == destination)
+                    {
+                        CurrentList.Remove(destination);
+                        return;
+                    }
                 }
                 else
                 {
@@ -252,6 +284,28 @@ namespace Elevator
                 //FutureDirection = OppositeDirection;
                 return;
             }
+        }
+
+        /// <summary>
+        /// This method is called asynchronously.  It executes on a timer event.
+        /// This method determines whether to stop on the current floor or proceed to the next floor.
+        /// </summary>
+        public void Proceed(object source, ElapsedEventArgs e)
+        {
+            if (ArrivedDestination())
+            {
+                return;
+            }
+
+            if (IsIdle())
+            {
+                return;
+            }
+
+            DetermineDirection();
+
+            MoveElevator();
+
         }
 
         /// <summary>
