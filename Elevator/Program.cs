@@ -123,7 +123,7 @@ namespace Elevator
                 if (!downList.Contains(floor))
                 {
                     downList.Add(floor);
-                    downList.Reverse();
+                    downList.OrderByDescending(x => x);
                 }
             }
         }
@@ -146,19 +146,34 @@ namespace Elevator
 
             AddFloorToList(floor, requestedDirection);
         }
-/*
-        List<int> DirectionList()
+
+        /// <summary>
+        /// Conditionally add the floor request to a list.
+        /// 
+        /// If the car is heading up past floor 5 and the passenger hits 2, the floor is added to the other list.
+        /// If the car is idle and responding to a floor request and happens to have a passenger
+        /// </summary>
+        /// <param name="floor"></param>
+        private void RequestFromCar(int floor)
         {
-            List<int> directionList = null;
-
-            if (CurrentDirection == Direction.up)
-                directionList = upList;
-            else if (CurrentDirection == Direction.down)
-                directionList = downList;
-
-            return directionList;
+            if (((CurrentDirection == Direction.up) && (floor > CurrentFloor)) ||
+                ((CurrentDirection == Direction.down) && (floor < CurrentFloor)))
+            {
+                Direction currentListdirection = (CurrentList == upList) ? Direction.up : Direction.down;
+                AddFloorToList(floor, currentListdirection);
+            }
+            // This condition is most relevant to a building with a single elevator
+            else if (((CurrentDirection == Direction.up) && (floor <= CurrentFloor)) ||
+                     ((CurrentDirection == Direction.down) && (floor >= CurrentFloor)))
+            {
+                AddFloorToList(floor, OppositeDirection);
+            }
+            else if (CurrentDirection == Direction.idle)
+            {
+                AddFloorToList(floor, FutureDirection);
+            }
         }
-*/
+
         public void SetDirection()
         {
             // Set direction based upon floor and first item in CurrentList
@@ -180,6 +195,15 @@ namespace Elevator
         private bool ArrivedDestination()
         {
             bool arrived = false;
+
+            // Are we heading in a direction, but servicing the opposite list (i.e. heading up to service the downList - or vice versa)
+            Direction currentListDirection = (CurrentList == upList) ? Direction.up : Direction.down;
+            if (currentListDirection != CurrentDirection)
+            {
+                // We are servicing opposing list / direction case.  We have only arrived if we are at the head of the list.
+                if ((CurrentList.Count > 0) && (CurrentList[0] != CurrentFloor))
+                    return arrived;
+            }
 
             if (CurrentList.Contains(CurrentFloor))
             {
@@ -306,32 +330,6 @@ namespace Elevator
 
             MoveElevator();
 
-        }
-
-        /// <summary>
-        /// Conditionally add the floor request to a list.
-        /// 
-        /// If the car is heading up past floor 5 and the passenger hits 2, the floor is added to the other list.
-        /// If the car is idle and responding to a floor request and happens to have a passenger
-        /// </summary>
-        /// <param name="floor"></param>
-        private void RequestFromCar(int floor)
-        {
-            if (((CurrentDirection == Direction.up) && (floor > CurrentFloor)) ||
-                ((CurrentDirection == Direction.down) && (floor < CurrentFloor)))
-            {
-                AddFloorToList(floor, CurrentDirection);
-            }
-            // This condition is most relevant to a building with a single elevator
-            else if (((CurrentDirection == Direction.up) && (floor <= CurrentFloor)) ||
-                     ((CurrentDirection == Direction.down) && (floor >= CurrentFloor)))
-            {
-                AddFloorToList(floor, OppositeDirection);
-            }
-            else if (CurrentDirection == Direction.idle)
-            {
-                AddFloorToList(floor, FutureDirection);
-            }
         }
 
         /// <summary>
